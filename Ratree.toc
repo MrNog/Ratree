@@ -1,0 +1,16 @@
+## Interface: 30300
+## Title: Ratree
+## Notes: Talents and glyphs in one window: plan every point, then learn them all at once. Saved presets per class.
+## Author: Okanor
+## Version: 0.1.0
+## SavedVariables: RatreeDB
+
+Core.lua
+Widgets.lua
+Window.lua
+Trees.lua
+Presets.lua
+Glyphs.lua
+Inspect.lua
+Entry.lua
+Conflict.lua
