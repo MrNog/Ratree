@@ -4,7 +4,8 @@ local W = RT.W
 local abs, sin, sqrt = math.abs, math.sin, math.sqrt
 
 local MASK = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"
-local GLOW = "Interface\\Buttons\\UI-ActionButton-Border"
+-- a soft round band that hugs the socket ring
+local GLOW = RT.MEDIA .. "UI\\roundglow"
 local LINE = "Interface\\TaxiFrame\\UI-Taxi-Line"
 
 local MAJOR = { ring = 84 }
@@ -182,7 +183,7 @@ local function paintSocket(button, socket, group, activeGroup)
 
     local ring = kind.ring
     button:SetSize(ring, ring)
-    button.glow:SetSize(ring * 1.9, ring * 1.9)
+    button.glow:SetSize(ring * 1.6, ring * 1.6)
     button.back:SetSize(ring - 2, ring - 2)
     button.icon:SetSize(ring * RT.ICON_IN_RING, ring * RT.ICON_IN_RING)
     button.ring:SetSize(ring, ring)

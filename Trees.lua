@@ -83,7 +83,7 @@ local function nodeEnter(node)
     node.hover:Show()
     local ctx = RT.Context()
     GameTooltip:SetOwner(node, "ANCHOR_RIGHT")
-    if ctx.inspect then
+    if ctx.inspect or ctx.plan then
         local link = RT.TalentLink(ctx, node.tab, node.index)
         if link then GameTooltip:SetHyperlink(link) end
         return
@@ -111,6 +111,14 @@ local function nodeClick(node, button)
     if not ctx.editable then return end
     local delta = (button == "LeftButton" and 1) or (button == "RightButton" and -1) or nil
     if not delta then return end
+    if ctx.plan then
+        if RT.PlanChange(ctx, node.tab, node.index, delta) then
+            PlaySound(delta > 0 and SOUND_ADD or SOUND_REMOVE)
+            RT.Refresh()
+        end
+        if GameTooltip:IsOwned(node) then nodeEnter(node) end
+        return
+    end
     local before = previewRank(node.tab, node.index, ctx)
     AddPreviewTalentPoints(node.tab, node.index, delta, ctx.pet, ctx.group)
     if previewRank(node.tab, node.index, ctx) ~= before then
@@ -441,7 +449,8 @@ function RT.PaintTrees()
     for slot = 1, 3 do trees[slot]:Hide() end
     for tab = 1, count do
         local data = readTree(ctx, tab, perTier, available, depth)
-        committed[tab] = data.committed
+        -- a plan has nothing learned: its art follows the planned points
+        committed[tab] = ctx.plan and data.points or data.committed
         local tree = trees[ctx.pet and 2 or tab]
         if tree then paintTree(tree, tab, data) end
     end
@@ -505,6 +514,10 @@ StaticPopupDialogs["RATREE_LEARN"] = {
 
 local function activateClicked()
     local ctx = RT.Context()
+    if ctx.plan then
+        if RT.Staged(ctx) > 0 then StaticPopup_Show("RATREE_SAVE_PRESET") end
+        return
+    end
     if not ctx.editable then
         SetActiveTalentGroup(ctx.group)
         return
@@ -514,6 +527,11 @@ end
 
 local function discardClicked()
     local ctx = RT.Context()
+    if ctx.plan then
+        RT.PlanClear()
+        RT.Refresh()
+        return
+    end
     if ctx.editable then ResetGroupPreviewTalentPoints(ctx.pet, ctx.group) end
 end
 
@@ -592,6 +610,23 @@ function RT.BuildFooterControls(footer)
     end)
     bar.glyphs = glyphs
 
+    -- A blank plan of your trees, saved as a preset; Back leaves it.
+    local plan = W.Button("RatreePlanButton", footer, 80, 24, "Plan")
+    plan:SetPoint("RIGHT", glyphs, "LEFT", -8, 0)
+    plan:SetScript("OnClick", function()
+        if RT.Planning() then RT.EndPlan() else RT.StartPlan() end
+    end)
+    W.TipOnHover(plan, "Plan", "A blank set of your trees: click a build in without touching your talents, "
+        .. "then save it as a preset.")
+    bar.plan = plan
+
+    -- In a plan: paste a Wowhead talent link into it.
+    local import = W.Button("RatreeImportButton", footer, 80, 24, "Import")
+    import:SetPoint("RIGHT", plan, "LEFT", -8, 0)
+    import:SetScript("OnClick", function() StaticPopup_Show("RATREE_IMPORT") end)
+    W.TipOnHover(import, "Import", "Paste a Wowhead talent calculator link: the build fills the plan.")
+    bar.import = import
+
     RT.BuildCastBar(footer)
 
     RT.Listen("PLAYER_REGEN_DISABLED", RT.ClearSearchFocus)
@@ -628,7 +663,7 @@ function RT.UpdateFooter()
     if ctx.inspect then
         bar.search:Show()
         bar.points:Show()
-        for _, widget in ipairs({ bar.presets, bar.activate, bar.discard, bar.glyphs }) do widget:Hide() end
+        for _, widget in ipairs({ bar.presets, bar.activate, bar.discard, bar.glyphs, bar.plan, bar.import }) do widget:Hide() end
         local split = {}
         for tab = 1, RT.NumTabs(ctx) do
             local _, _, spent = RT.TabInfo(ctx, tab)
@@ -643,8 +678,17 @@ function RT.UpdateFooter()
         if glyphs then widget:Hide() else widget:Show() end
     end
     if glyphs or ctx.pet then bar.presets:Hide() else bar.presets:Show() end
+    if glyphs or ctx.pet then bar.plan:Hide() else bar.plan:Show() end
+    bar.plan:SetText(ctx.plan and "Back" or "Plan")
+    if ctx.plan and not glyphs then bar.import:Show() else bar.import:Hide() end
+    bar.discard:SetText(ctx.plan and "Clear" or "Discard")
 
-    if live then
+    if ctx.plan and not glyphs then
+        local planned = RT.Staged(ctx)
+        bar.points:SetText(format("Plan  ·  points left |cff8fdc7a%d|r", max(0, RT.Unspent(ctx) - planned)))
+        setActivate("Save as preset", planned > 0)
+        if planned > 0 then bar.discard:Show() else bar.discard:Hide() end
+    elseif live then
         local staged = RT.Staged(ctx)
         local left = max(0, RT.Unspent(ctx) - staged)
         bar.points:SetText(format("Points left |cff8fdc7a%d|r", left))

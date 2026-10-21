@@ -12,5 +12,6 @@ Trees.lua
 Presets.lua
 Glyphs.lua
 Inspect.lua
+Plan.lua
 Entry.lua
 Conflict.lua

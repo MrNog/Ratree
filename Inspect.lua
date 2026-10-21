@@ -93,6 +93,10 @@ function RT.TabInfo(ctx, tab)
         local tree = RT.inspectSnap.tabs[tab]
         return tree.name, tree.icon, tree.spent, tree.background, 0
     end
+    if ctx.plan then
+        local name, icon, _, background = GetTalentTabInfo(tab, false, false, ctx.group)
+        return name, icon, 0, background, RT.PlanTabPoints(tab)
+    end
     return GetTalentTabInfo(tab, false, ctx.pet, ctx.group)
 end
 
@@ -105,6 +109,12 @@ function RT.TalentInfo(ctx, tab, index)
     if ctx.inspect then
         local info = RT.inspectSnap.tabs[tab].talents[index].info
         return unpack(info, 1, info.n)
+    end
+    if ctx.plan then
+        -- nothing learned: the plan's rank is the pending one
+        local name, icon, tier, column, _, maxRank, exceptional = GetTalentInfo(tab, index, false, false, ctx.group)
+        local met = RT.PlanMet(ctx, tab, index)
+        return name, icon, tier, column, 0, maxRank, exceptional, met, RT.PlanRank(tab, index), met
     end
     return GetTalentInfo(tab, index, false, ctx.pet, ctx.group)
 end
@@ -119,5 +129,6 @@ end
 
 function RT.TalentLink(ctx, tab, index)
     if ctx.inspect then return RT.inspectSnap.tabs[tab].talents[index].link end
+    if ctx.plan then return RT.PlanLink(ctx, tab, index) end
     return GetTalentLink(tab, index, false, ctx.pet, ctx.group)
 end

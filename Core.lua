@@ -110,6 +110,10 @@ function RT.Context()
         return { inspect = true, pet = false, group = snap and snap.group or 1, editable = false }
     end
     local view = RT.view
+    -- A plan: your own trees, blank, every click staying inside the plan.
+    if RT.plan and not view.pet then
+        return { inspect = false, plan = true, pet = false, group = RT.ActiveGroup(), editable = true }
+    end
     local ctx = { inspect = false, pet = view.pet and RT.PetHasTalents() or false }
     if ctx.pet then
         ctx.group = GetActiveTalentGroup(false, true) or 1
@@ -126,11 +130,13 @@ function RT.Browsing()
 end
 
 function RT.Unspent(ctx)
+    if ctx.plan then return RT.PlanBudget() end
     if not ctx.editable then return 0 end
     return GetUnspentTalentPoints(false, ctx.pet, ctx.group) or 0
 end
 
 function RT.Staged(ctx)
+    if ctx.plan then return RT.PlanTotal() end
     if not ctx.editable then return 0 end
     return GetGroupPreviewTalentPointsSpent(ctx.pet, ctx.group) or 0
 end
@@ -157,8 +163,10 @@ local SPECS = {
 -- Spec art that exists as Media\Art\<class>-<spec>.blp; any spec not listed uses the class art.
 RT.SPEC_ART = {}
 for key in ("deathknight-blood deathknight-frost deathknight-unholy druid-balance druid-feral druid-restoration "
-    .. "hunter-beastmastery hunter-survival mage-arcane mage-fire mage-frost paladin-holy paladin-protection "
-    .. "paladin-retribution priest-discipline priest-holy"):gmatch("%S+") do
+    .. "hunter-beastmastery hunter-marksmanship hunter-survival mage-arcane mage-fire mage-frost paladin-holy "
+    .. "paladin-protection paladin-retribution priest-discipline priest-holy priest-shadow rogue-assassination rogue-combat "
+    .. "rogue-subtlety shaman-elemental shaman-enhancement shaman-restoration warlock-affliction "
+    .. "warlock-demonology warlock-destruction warrior-arms warrior-fury warrior-protection"):gmatch("%S+") do
     RT.SPEC_ART[key] = true
 end
 
@@ -167,14 +175,16 @@ function RT.SpecSlug(class, tree)
     return specs and specs[tree]
 end
 
+-- The art's path, and whether it is split: spec art is two 1024x1024 halves (<path>-l, <path>-r)
+-- for twice the sharpness; the class art is one 1024x512 picture.
 function RT.ArtFor(class, tree)
     local slug = class and class:lower()
     if not slug then return nil end
     local spec = RT.SpecSlug(class, tree)
     if spec and RT.SPEC_ART[slug .. "-" .. spec] then
-        return RT.MEDIA .. "Art\\" .. slug .. "-" .. spec
+        return RT.MEDIA .. "Art\\" .. slug .. "-" .. spec, true
     end
-    return RT.MEDIA .. "Art\\" .. slug
+    return RT.MEDIA .. "Art\\" .. slug, false
 end
 
 -- Round icon: the art cut to a circle with the ring on top, whose black inner band hides the square

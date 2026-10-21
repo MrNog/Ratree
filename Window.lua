@@ -2,41 +2,65 @@ local RT = select(2, ...)
 local W = RT.W
 
 RT.WIDTH = 1100
-RT.TITLE_H = 24
+RT.TITLE_H = 30
+-- the window's fill, also worn by the corner covers
+local FILL = { 0.043, 0.043, 0.047 }
 RT.BODY_H = 620
 RT.FOOTER_H = 64
 
 -- The art is 2:1; the body is wider than tall by less, so the left side is cut and the rat stays.
-local ART_LEFT = 1 - (RT.WIDTH / RT.BODY_H) / 2
+local ART_W = RT.WIDTH - 2 * W.INSET
+local ART_LEFT = 1 - (ART_W / RT.BODY_H) / 2
 
 -- Art ---------------------------------------------------------------------------------------------
 
--- Full colour; a spec you are only browsing is shown darker.
+-- Drawn as a left and a right half that meet at the picture's middle: a split spec art is two
+-- textures; the class art is one, cut at the same line.
 function RT.SetArt(class, tree, browsing)
-    local art = RT.art
-    art:SetTexture(RT.ArtFor(class, tree))
-    art:SetTexCoord(ART_LEFT, 1, 0, 1)
-    art:SetDesaturated(false)
+    local path, split = RT.ArtFor(class, tree)
+    local left, right = RT.art, RT.artRight
+    if split then
+        left:SetTexture(path .. "-l")
+        left:SetTexCoord(ART_LEFT * 2, 1, 0, 1)
+        right:SetTexture(path .. "-r")
+        right:SetTexCoord(0, 1, 0, 1)
+    else
+        left:SetTexture(path)
+        left:SetTexCoord(ART_LEFT, 0.5, 0, 1)
+        right:SetTexture(path)
+        right:SetTexCoord(0.5, 1, 0, 1)
+    end
+    -- full colour; a spec you are only browsing is shown darker
     local shade = browsing and 0.55 or 1
-    art:SetVertexColor(shade, shade, shade)
+    for _, tex in ipairs({ left, right }) do
+        tex:SetDesaturated(false)
+        tex:SetVertexColor(shade, shade, shade)
+    end
 end
 
 local function buildArt(body)
+    -- W.INSET in from the window's sides, like everything inside the cut frame
     local art = body:CreateTexture(nil, "BACKGROUND", nil, 1)
-    art:SetAllPoints(body)
+    art:SetPoint("TOPLEFT", body, "TOPLEFT", W.INSET, 0)
+    art:SetPoint("BOTTOMLEFT", body, "BOTTOMLEFT", W.INSET, 0)
+    art:SetWidth(ART_W * (0.5 - ART_LEFT) / (1 - ART_LEFT))
     RT.art = art
+    local artRight = body:CreateTexture(nil, "BACKGROUND", nil, 1)
+    artRight:SetPoint("TOPLEFT", art, "TOPRIGHT", 0, 0)
+    artRight:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -W.INSET, 0)
+    RT.artRight = artRight
 
     -- Darkens the left two thirds where the trees sit; the rat on the right stays visible.
     local left = body:CreateTexture(nil, "BACKGROUND", nil, 2)
     left:SetTexture(1, 1, 1, 1)
     left:SetGradientAlpha("HORIZONTAL", 0.04, 0.04, 0.045, 0.9, 0.04, 0.04, 0.045, 0.6)
-    left:SetPoint("TOPLEFT", body, "TOPLEFT", 0, 0)
+    left:SetPoint("TOPLEFT", body, "TOPLEFT", W.INSET, 0)
     left:SetPoint("BOTTOMRIGHT", body, "BOTTOMLEFT", RT.WIDTH * 0.45, 0)
     local right = body:CreateTexture(nil, "BACKGROUND", nil, 2)
     right:SetTexture(1, 1, 1, 1)
     right:SetGradientAlpha("HORIZONTAL", 0.04, 0.04, 0.045, 0.6, 0.04, 0.04, 0.045, 0)
     right:SetPoint("TOPLEFT", left, "TOPRIGHT", 0, 0)
-    right:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", 0, 0)
+    right:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -W.INSET, 0)
 end
 
 -- Title bar and portrait --------------------------------------------------------------------------
@@ -49,18 +73,22 @@ local function buildTitle(win)
     local bg = bar:CreateTexture(nil, "BACKGROUND")
     bg:SetTexture(1, 1, 1, 1)
     bg:SetGradientAlpha("VERTICAL", 0.082, 0.075, 0.059, 1, 0.141, 0.125, 0.102, 1)
-    bg:SetAllPoints(bar)
+    -- inside the cut frame; its top corners cut by covers
+    bg:SetPoint("TOPLEFT", bar, "TOPLEFT", W.INSET, -W.INSET)
+    bg:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -W.INSET, 0)
+    W.CoverCorners(bar, bg, FILL[1], FILL[2], FILL[3], { "TOPLEFT", "TOPRIGHT" })
     local line = W.Solid(bar, "BORDER", W.EDGE[1], W.EDGE[2], W.EDGE[3])
     line:SetHeight(1)
-    line:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
-    line:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
+    line:SetPoint("BOTTOMLEFT", bg, "BOTTOMLEFT", 0, 0)
+    line:SetPoint("BOTTOMRIGHT", bg, "BOTTOMRIGHT", 0, 0)
 
     local title = W.Text(bar, 12, 0.878, 0.761, 0.478)
-    title:SetPoint("CENTER", bar, "CENTER", 0, 0)
+    title:SetPoint("CENTER", bg, "CENTER", 0, 0)
     RT.title = title
 
     local close = W.CloseButton("RatreeCloseButton", bar)
-    close:SetPoint("RIGHT", bar, "RIGHT", 0, 0)
+    close:SetSize(22, 22)
+    close:SetPoint("RIGHT", bg, "RIGHT", -2, 0)
     close:SetScript("OnClick", function() win:Hide() end)
 
     -- The class icon in a gold ring, sitting over the window's top-left corner.
@@ -95,13 +123,15 @@ local function buildFooter(win)
     local west = footer:CreateTexture(nil, "BACKGROUND")
     west:SetTexture(sheet)
     west:SetTexCoord(0.005740792, 809 / 1024, 209 / 512, 0.562353516)
-    west:SetPoint("TOPLEFT", footer, "TOPLEFT", 0, 0)
-    west:SetPoint("BOTTOMRIGHT", footer, "BOTTOM", 0, 0)
+    west:SetPoint("TOPLEFT", footer, "TOPLEFT", W.INSET, 0)
+    west:SetPoint("BOTTOMRIGHT", footer, "BOTTOM", 0, W.INSET)
     local east = footer:CreateTexture(nil, "BACKGROUND")
     east:SetTexture(sheet)
     east:SetTexCoord(6 / 1024, 0.790157645, 297 / 512, 0.734228516)
     east:SetPoint("TOPLEFT", footer, "TOP", 0, 0)
-    east:SetPoint("BOTTOMRIGHT", footer, "BOTTOMRIGHT", 0, 0)
+    east:SetPoint("BOTTOMRIGHT", footer, "BOTTOMRIGHT", -W.INSET, W.INSET)
+    W.CoverCorners(footer, west, FILL[1], FILL[2], FILL[3], { "BOTTOMLEFT" })
+    W.CoverCorners(footer, east, FILL[1], FILL[2], FILL[3], { "BOTTOMRIGHT" })
     RT.footer = footer
 end
 
@@ -115,6 +145,8 @@ local sideTabs = {}
 -- key: 1 or 2 for a spec, "pet", "talents" (the active spec) or "glyphs".
 function RT.OpenPage(key)
     PlaySound("igCharacterInfoTab")
+    -- going anywhere else leaves a plan
+    RT.plan = nil
     local view = RT.view
     if key == "glyphs" or key == "talents" then
         view.page, view.pet = key, false
@@ -156,32 +188,24 @@ local function sideTip(tab)
     GameTooltip:Show()
 end
 
--- A plate in the window's own colours, open on its left side so it reads as part of the window.
+-- A cut plate in the window's own colours. It starts TUCK under the window and sits below it,
+-- so only its right side shows and it reads as part of the window.
+local TUCK = 8
 local function newSideTab(win, key)
     local tab = CreateFrame("Button", nil, win)
-    tab:SetSize(SIDE, SIDE)
+    tab:SetSize(SIDE + TUCK, SIDE)
+    tab:SetFrameLevel(math.max(0, win:GetFrameLevel() - 1))
     tab.key = key
-    local fill = W.Solid(tab, "BACKGROUND", 0.043, 0.043, 0.047)
-    fill:SetAllPoints(tab)
-    for _, side in ipairs({ "TOP", "BOTTOM" }) do
-        local edge = W.Solid(tab, "BORDER", W.EDGE[1], W.EDGE[2], W.EDGE[3])
-        edge:SetHeight(1)
-        edge:SetPoint(side .. "LEFT", tab, side .. "LEFT", 0, 0)
-        edge:SetPoint(side .. "RIGHT", tab, side .. "RIGHT", 0, 0)
-    end
-    local right = W.Solid(tab, "BORDER", W.EDGE[1], W.EDGE[2], W.EDGE[3])
-    right:SetWidth(1)
-    right:SetPoint("TOPRIGHT", tab, "TOPRIGHT", 0, 0)
-    right:SetPoint("BOTTOMRIGHT", tab, "BOTTOMRIGHT", 0, 0)
+    W.Chamfer(tab, false, FILL, W.EDGE)
 
     tab.icon = tab:CreateTexture(nil, "ARTWORK")
     tab.icon:SetSize(SIDE_ICON, SIDE_ICON)
-    tab.icon:SetPoint("CENTER", tab, "CENTER", 0, 0)
+    tab.icon:SetPoint("CENTER", tab, "CENTER", TUCK / 2, 0)
     tab.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     -- The same frame the talent icons wear: gold when selected, grey otherwise.
     tab.frame = tab:CreateTexture(nil, "OVERLAY")
     tab.frame:SetSize(SIDE_FRAME, SIDE_FRAME)
-    tab.frame:SetPoint("CENTER", tab, "CENTER", 0, 0)
+    tab.frame:SetPoint("CENTER", tab.icon, "CENTER", 0, 0)
     local hover = tab:CreateTexture(nil, "HIGHLIGHT")
     hover:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
     hover:SetBlendMode("ADD")
@@ -226,8 +250,8 @@ function RT.UpdateTabs()
             if previous then
                 tab:SetPoint("TOP", previous, "BOTTOM", 0, -4)
             else
-                -- One pixel over the window's edge, so the tab and window share the border line.
-                tab:SetPoint("TOPLEFT", RT.win, "TOPRIGHT", -1, -(RT.TITLE_H + 20))
+                -- Tucked under the window's edge, so the tab and window share the border line.
+                tab:SetPoint("TOPLEFT", RT.win, "TOPRIGHT", -TUCK, -(RT.TITLE_H + 20))
             end
             tab:Show()
             previous = tab
@@ -247,7 +271,8 @@ function RT.ShowPage()
         RT.SetTitle(GLYPHS)
     else
         RT.Call("HideGlyphRoot")
-        RT.SetTitle(RT.Inspecting() and (RT.inspectName or TALENTS) or TALENTS)
+        RT.SetTitle(RT.Inspecting() and (RT.inspectName or TALENTS)
+            or (RT.plan and (TALENTS .. " - Plan")) or TALENTS)
     end
     RT.Call("ClosePresetMenu")
     RT.Refresh()
@@ -292,9 +317,12 @@ function RT.BuildWindow()
     win:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
     tinsert(UISpecialFrames, win:GetName())
 
-    local fill = W.Solid(win, "BACKGROUND", 0.043, 0.043, 0.047)
-    fill:SetAllPoints(win)
-    W.Border(win, W.EDGE[1], W.EDGE[2], W.EDGE[3], 1, "OVERLAY")
+    -- Cut corners. The line is drawn on its own frame above the art, title bar and footer
+    -- (children draw over their parent), but below the class icon's ring.
+    local edge = CreateFrame("Frame", nil, win)
+    edge:SetAllPoints(win)
+    edge:SetFrameLevel(win:GetFrameLevel() + 8)
+    W.Chamfer(win, true, FILL, W.EDGE, edge)
 
     local body = CreateFrame("Frame", nil, win)
     body:SetPoint("TOPLEFT", win, "TOPLEFT", 0, -RT.TITLE_H)

@@ -36,6 +36,61 @@ function W.Border(frame, r, g, b, a, layer)
     return edges
 end
 
+-- Cut corners. 3.3.5a cannot mask a frame, so Media\UI\chamfer (a white cut-corner fill and a
+-- cut-corner line, in a large and a small size) is sliced nine ways and tinted.
+--   W.Chamfer(frame, big, fill, edge[, edgeHost]) -> { fill = pieces, edge = pieces }
+-- fill / edge are { r, g, b[, a] }. edgeHost, when given, draws the line on that frame (anchored
+-- to `frame`), so it can sit above the frame's children.
+local CHAMFER = RT.MEDIA .. "UI\\chamfer"
+local CH_U = { big = { 0, 24 / 128, 40 / 128, 64 / 128 }, small = { 0, 16 / 128, 48 / 128, 64 / 128 } }
+
+local function ninePieces(host, frame, layer, ox, oy, corner, u, color)
+    local pieces = {}
+    local xs = { { "LEFT", 0 }, { "LEFT", corner }, { "RIGHT", -corner }, { "RIGHT", 0 } }
+    local ys = { { "TOP", 0 }, { "TOP", -corner }, { "BOTTOM", corner }, { "BOTTOM", 0 } }
+    for row = 1, 3 do
+        for col = 1, 3 do
+            local tex = host:CreateTexture(nil, layer)
+            tex:SetTexture(CHAMFER)
+            tex:SetTexCoord(ox + u[col], ox + u[col + 1], oy + u[row], oy + u[row + 1])
+            local x1, y1, x2, y2 = xs[col], ys[row], xs[col + 1], ys[row + 1]
+            tex:SetPoint("TOPLEFT", frame, y1[1] .. x1[1], x1[2], y1[2])
+            tex:SetPoint("BOTTOMRIGHT", frame, y2[1] .. x2[1], x2[2], y2[2])
+            tex:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
+            pieces[#pieces + 1] = tex
+        end
+    end
+    return pieces
+end
+
+function W.Chamfer(frame, big, fill, edge, edgeHost)
+    local corner, oy, u = big and 12 or 8, big and 0 or 0.5, big and CH_U.big or CH_U.small
+    return {
+        fill = ninePieces(frame, frame, "BACKGROUND", 0, oy, corner, u, fill),
+        edge = ninePieces(edgeHost or frame, frame, "OVERLAY", 0.5, oy, corner, u, edge),
+    }
+end
+
+-- Square textures inside a cut window would poke past its cut. Content sits W.INSET in from the
+-- edge, and a small triangle in the window's fill colour over each outer corner cuts it parallel
+-- to the window's edge.
+--   W.CoverCorners(host, region, r, g, b, corners)
+local COVER = RT.MEDIA .. "UI\\cutcover"
+local COVER_TC = { TOPLEFT = { 0, 1, 0, 1 }, TOPRIGHT = { 1, 0, 0, 1 },
+    BOTTOMLEFT = { 0, 1, 1, 0 }, BOTTOMRIGHT = { 1, 0, 1, 0 } }
+W.INSET, W.COVER = 6, 6.5
+
+function W.CoverCorners(host, region, r, g, b, corners)
+    for _, c in ipairs(corners) do
+        local tex = host:CreateTexture(nil, "OVERLAY")
+        tex:SetTexture(COVER)
+        tex:SetTexCoord(unpack(COVER_TC[c]))
+        tex:SetSize(W.COVER, W.COVER)
+        tex:SetPoint(c, region, c, 0, 0)
+        tex:SetVertexColor(r, g, b, 1)
+    end
+end
+
 function W.SetBorderColor(edges, r, g, b, a)
     for _, tex in ipairs(edges) do tex:SetTexture(r, g, b, a or 1) end
 end
