@@ -233,6 +233,28 @@ StaticPopupDialogs["RATREE_DELETE_PRESET"] = {
     hideOnEscape = 1,
 }
 
+local function saveBarsTo(preset)
+    local count = RT.SaveBars(preset)
+    RT.Notify(format("Bars saved to %s: %d slots.", preset.name, count), 0.2, 1, 0.2)
+    RT.Call("PaintPresetMenu")
+end
+
+StaticPopupDialogs["RATREE_REPLACE_BARS"] = {
+    text = "%s already has bars saved.\nReplace them with your bars now?",
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function(_, preset)
+        if InCombatLockdown() then
+            RT.Notify(ERR_NOT_IN_COMBAT, 1, 0.3, 0.3)
+            return
+        end
+        saveBarsTo(preset)
+    end,
+    timeout = 0,
+    whileDead = 1,
+    hideOnEscape = 1,
+}
+
 -- Menu --------------------------------------------------------------------------------------------
 
 local menu
@@ -283,9 +305,11 @@ local function newRow(index)
             RT.Notify(ERR_NOT_IN_COMBAT, 1, 0.3, 0.3)
             return
         end
-        local count = RT.SaveBars(row.preset)
-        RT.Notify(format("Bars saved to %s: %d slots.", row.preset.name, count), 0.2, 1, 0.2)
-        RT.PaintPresetMenu()
+        if RT.PresetBars(row.preset) then
+            StaticPopup_Show("RATREE_REPLACE_BARS", row.preset.name, nil, row.preset)
+        else
+            saveBarsTo(row.preset)
+        end
     end)
     W.TipOnHover(row.bars, "Save my bars",
         "Saves this character's action bars into the preset. Applying the preset puts them back.")
