@@ -32,6 +32,7 @@ mind as often as you like, and only spend the points when you press **Learn Tale
 |---|---|
 | **Plan, then learn** | Left click adds a point, right click takes it back. Nothing is spent until **Learn Talents (N)**, which shows how many points are planned. **Discard** throws the plan away. |
 | **Presets** | Save a build ("Frost DK", "Blood Tank") and apply it later, for example on a freshly reset dual spec. Presets are kept per class and shared by every character of that class. |
+| **Bars in presets** | A preset also keeps your action bars, per character, for any bar layout (forms and stances too). Apply puts every spell, macro and item back on its key; talent spells fill in once learned. |
 | **Both specs** | Square tabs on the window's edge show each spec's main tree. Browse the other one and switch to it, with a cast bar in the footer while the switch casts. |
 | **Hunter pets** | The pet tree has its own tab. |
 | **Inspect** | The inspect window's Talents tab opens the other player's trees here, kept steady even when your tooltip addons inspect someone else on mouseover. |
