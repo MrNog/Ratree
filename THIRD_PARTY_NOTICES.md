@@ -1,7 +1,8 @@
 # Third-party notices
 
 Ratree's talent and glyph logic (staging preview points, applying a saved build, the glyph socket
-layout and the key-binding takeover) follows the talents module of **DragonUI**, which is released
+layout and the key-binding takeover) follows the talents module of **DragonUI**, and finding or remaking a
+macro for the saved action bars follows its collections module. DragonUI is released
 under the MIT License:
 
 ```
@@ -31,6 +32,6 @@ SOFTWARE.
 Those parts stay under the MIT License above; the rest of Ratree, including the rat artwork, is under
 Ratree's own [LICENSE](LICENSE).
 
-The textures in `Media/Class/`, `Media/Talents/`, `Media/UI/redbutton2x` and `Media/Castbar/` are
+The textures in `Media/Class/`, `Media/Talents/`, `Media/UI/redbutton2x`, `Media/UI/controls` and `Media/Castbar/` are
 World of Warcraft artwork © Blizzard Entertainment, included only so the addon can show them in the
 game. The rat art, `Media/ring` and `Media/UI/redplate` are Ratree's own.

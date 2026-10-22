@@ -59,6 +59,7 @@ RT.Listen("ADDON_LOADED", function(_, name)
     local db = RatreeDB
     db.presets = db.presets or {}
     db.scale = db.scale or 0.9
+    if db.saveBars == nil then db.saveBars = true end
     RT.db = db
 end)
 

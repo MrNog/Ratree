@@ -8,7 +8,8 @@ local max, format = math.max, string.format
 local STAGE_ATTEMPTS = 400
 local ROW_H = 34
 local SAVE_H = 24
-local MENU_W = 350
+local CHECK_H = 30
+local MENU_W = 380
 
 -- Reading the character ---------------------------------------------------------------------------
 
@@ -133,6 +134,7 @@ function RT.ApplyPreset(preset)
     end
     if needed == 0 then
         RT.Notify("You already have this preset.", 0.2, 1, 0.2)
+        RT.LoadBars(preset)
         return
     end
     local unspent = GetUnspentTalentPoints(false, false, group) or 0
@@ -151,6 +153,8 @@ function RT.ApplyPreset(preset)
     else
         RT.Notify(preset.name .. " is ready. Check it, then Learn Talents.", 0.2, 1, 0.2)
     end
+    -- Spells the staged talents give are put on the bars once they are learned.
+    RT.LoadBars(preset)
 end
 
 -- Saving and deleting -----------------------------------------------------------------------------
@@ -173,15 +177,23 @@ local function savePreset(name)
     if name == "" then return end
     local ranks = currentRanks(RT.Context())
     local bucket = RT.ClassPresets()
-    for _, preset in ipairs(bucket) do
-        if preset.name == name then
-            preset.ranks = ranks
-            RT.Notify("Preset updated: " .. name, 0.2, 1, 0.2)
-            return
-        end
+    local preset
+    for _, saved in ipairs(bucket) do
+        if saved.name == name then preset = saved end
     end
-    bucket[#bucket + 1] = { name = name, ranks = ranks }
-    RT.Notify("Preset saved: " .. name, 0.2, 1, 0.2)
+    local verb = preset and "Preset updated: " or "Preset saved: "
+    if preset then
+        preset.ranks = ranks
+    else
+        preset = { name = name, ranks = ranks }
+        bucket[#bucket + 1] = preset
+    end
+    if RT.db.saveBars then
+        RT.SaveBars(preset)
+        RT.Notify(verb .. name .. ", with your bars", 0.2, 1, 0.2)
+    else
+        RT.Notify(verb .. name, 0.2, 1, 0.2)
+    end
 end
 
 StaticPopupDialogs["RATREE_SAVE_PRESET"] = {
@@ -255,6 +267,29 @@ local function newRow(index)
     row.apply = W.Button("RatreePresetApply" .. index, row, 64, 24, "Apply")
     row.apply:SetPoint("RIGHT", row.delete, "LEFT", -6, 0)
 
+    -- Saves this character's bars into the preset: a plate with a 3x2 grid of little slots on it,
+    -- gold once the preset holds bars for this character.
+    row.bars = W.Button("RatreePresetBars" .. index, row, 24, 24, "")
+    row.bars:SetPoint("RIGHT", row.apply, "LEFT", -6, 0)
+    row.bars.cells = {}
+    for i = 0, 5 do
+        local cell = row.bars:CreateTexture(nil, "OVERLAY")
+        cell:SetSize(3, 3)
+        cell:SetPoint("CENTER", row.bars, "CENTER", (i % 3 - 1) * 5, i < 3 and 2.5 or -2.5)
+        row.bars.cells[#row.bars.cells + 1] = cell
+    end
+    row.bars:SetScript("OnClick", function()
+        if InCombatLockdown() then
+            RT.Notify(ERR_NOT_IN_COMBAT, 1, 0.3, 0.3)
+            return
+        end
+        local count = RT.SaveBars(row.preset)
+        RT.Notify(format("Bars saved to %s: %d slots.", row.preset.name, count), 0.2, 1, 0.2)
+        RT.PaintPresetMenu()
+    end)
+    W.TipOnHover(row.bars, "Save my bars",
+        "Saves this character's action bars into the preset. Applying the preset puts them back.")
+
     -- Move the preset up or down the list: the order is yours, not the order they were saved in.
     -- side by side, up then down, each in a fixed place
     -- (the up arrow is drawn in the bottom of its texture and the down arrow in the top, so each
@@ -262,7 +297,7 @@ local function newRow(index)
     local function mover(dir, tex, x, y)
         local b = CreateFrame("Button", nil, row)
         b:SetSize(20, 20)
-        b:SetPoint("RIGHT", row.apply, "LEFT", x, y)
+        b:SetPoint("RIGHT", row.bars, "LEFT", x, y)
         b:SetNormalTexture(tex .. "-Up")
         b:SetPushedTexture(tex .. "-Down")
         b:SetHighlightTexture(tex .. "-Highlight", "ADD")
@@ -278,7 +313,7 @@ local function newRow(index)
         return b
     end
     -- a long name is cut before the arrows
-    row.name:SetPoint("RIGHT", row.apply, "LEFT", -52, 0)
+    row.name:SetPoint("RIGHT", row.bars, "LEFT", -52, 0)
     row.name:SetJustifyH("LEFT")
     if row.name.SetWordWrap then row.name:SetWordWrap(false) end
     row.up = mover(-1, "Interface\\Buttons\\Arrow-Up", -26, 5)
@@ -289,7 +324,8 @@ local function newRow(index)
         menu:Hide()
         RT.ApplyPreset(row.preset)
     end)
-    W.TipOnHover(row.apply, "Apply", "Stages the preset's points. Nothing is learned until you press Learn Talents.")
+    W.TipOnHover(row.apply, "Apply", "Stages the preset's points and puts back its bars. Nothing is learned "
+        .. "until you press Learn Talents.")
     return row
 end
 
@@ -307,6 +343,22 @@ local function buildMenu()
     menu.empty = W.Text(menu, 12, W.DIM[1], W.DIM[2], W.DIM[3])
     menu.empty:SetPoint("TOPLEFT", menu, "TOPLEFT", 14, -30)
     menu.empty:SetText("No presets for this class yet.")
+
+    -- the whole row toggles it, the box at its right edge
+    menu.withBars = CreateFrame("Button", nil, menu)
+    menu.withBars:SetSize(MENU_W - 24, CHECK_H)
+    W.Solid(menu.withBars, "BACKGROUND", 1, 1, 1, 0.03):SetAllPoints(menu.withBars)
+    local label = W.Text(menu.withBars, 13)
+    label:SetPoint("LEFT", menu.withBars, "LEFT", 8, 0)
+    label:SetText("Include my action bars")
+    local box, tick = W.CheckBox(menu.withBars, 20)
+    box:SetPoint("RIGHT", menu.withBars, "RIGHT", -4, 0)
+    menu.withBars.tick = tick
+    menu.withBars:SetScript("OnClick", function()
+        RT.db.saveBars = not RT.db.saveBars
+        PlaySound(RT.db.saveBars and "igMainMenuOptionCheckBoxOn" or "igMainMenuOptionCheckBoxOff")
+        RT.PaintPresetMenu()
+    end)
 
     menu.save = W.Button("RatreePresetSave", menu, MENU_W - 24, SAVE_H, "Save current build as a preset")
     menu.save:SetScript("OnClick", function()
@@ -328,7 +380,11 @@ function RT.PaintPresetMenu()
         if i > 1 then row.up:Show() else row.up:Hide() end
         if i < #bucket then row.down:Show() else row.down:Hide() end
         local split = treeSplit(preset)
-        row.split:SetText(table.concat(split, " / "))
+        local hasBars = RT.PresetBars(preset) ~= nil
+        row.split:SetText(table.concat(split, " / ") .. (hasBars and "  |cffe2b843bars saved|r" or "  no bars"))
+        for _, cell in ipairs(row.bars.cells) do
+            if hasBars then cell:SetTexture(0.886, 0.722, 0.263) else cell:SetTexture(0.45, 0.43, 0.4) end
+        end
         local _, icon = GetTalentTabInfo(RT.LeadingTree(split), false, false)
         row.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
         row:Show()
@@ -336,9 +392,12 @@ function RT.PaintPresetMenu()
     for i = #bucket + 1, #rows do rows[i]:Hide() end
     local listH = math.max(#bucket, 1) * ROW_H
     if #bucket == 0 then menu.empty:Show() else menu.empty:Hide() end
+    if RT.db.saveBars then menu.withBars.tick:Show() else menu.withBars.tick:Hide() end
+    menu.withBars:ClearAllPoints()
+    menu.withBars:SetPoint("TOPLEFT", menu, "TOPLEFT", 12, -24 - listH - 8)
     menu.save:ClearAllPoints()
-    menu.save:SetPoint("TOPLEFT", menu, "TOPLEFT", 12, -24 - listH - 8)
-    menu:SetHeight(24 + listH + 8 + SAVE_H + 12)
+    menu.save:SetPoint("TOPLEFT", menu.withBars, "BOTTOMLEFT", 0, -8)
+    menu:SetHeight(24 + listH + 8 + CHECK_H + 8 + SAVE_H + 12)
 end
 
 function RT.TogglePresetMenu(anchor)

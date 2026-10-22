@@ -214,3 +214,19 @@ function W.CloseButton(name, parent)
     dress("Highlight", 115 / 256, 151 / 256, 1 / 128, 39 / 128, "ADD")
     return close
 end
+
+-- Checkbox: retail's dark box with a bronze edge and a yellow tick, from DragonUI's controls sheet.
+local CONTROLS = RT.MEDIA .. "UI\controls"
+
+function W.CheckBox(parent, size)
+    local box = parent:CreateTexture(nil, "ARTWORK")
+    box:SetSize(size, size)
+    box:SetTexture(CONTROLS)
+    box:SetTexCoord(0.5, 0.734375, 0.015625, 0.12890625)
+    local tick = parent:CreateTexture(nil, "OVERLAY")
+    tick:SetAllPoints(box)
+    tick:SetTexture(CONTROLS)
+    tick:SetTexCoord(0.03125, 0.265625, 0.203125, 0.31640625)
+    tick:Hide()
+    return box, tick
+end
