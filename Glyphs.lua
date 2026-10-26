@@ -379,7 +379,7 @@ end
 
 function RT.UpdateGlyphSwitch()
     if not switch then return end
-    local shown = RT.view.page == "glyphs" and RT.NumGroups() >= 2
+    local shown = RT.view.page == "glyphs" and RT.NumGroups() >= 2 and not RT.Casting()
     if not shown then
         switch:Hide()
         return
