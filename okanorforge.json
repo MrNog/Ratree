@@ -1,0 +1,9 @@
+{
+  "game": "wotlk",
+  "name": "Ratree",
+  "desc": "Talents & glyphs",
+  "folders": [
+    "Ratree"
+  ],
+  "asset": "Ratree.zip"
+}
