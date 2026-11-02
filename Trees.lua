@@ -711,7 +711,7 @@ function RT.UpdateFooter()
     bar.glyphs:SetText(glyphs and TALENTS or GLYPHS)
     if UnitLevel("player") >= (SHOW_INSCRIPTION_LEVEL or 15) then bar.glyphs:Show() else bar.glyphs:Hide() end
 
-    -- While the spec switch casts, its bar takes the middle of the footer.
+    -- While a spec switch or glyph casts, its bar takes the middle of the footer.
     if bar.cast:IsShown() then
         bar.search:Hide()
         bar.activate:Hide()
@@ -720,7 +720,7 @@ function RT.UpdateFooter()
     RT.Call("UpdateGlyphSwitch")
 end
 
--- Spec switch cast bar ----------------------------------------------------------------------------
+-- Spec switch and glyph cast bar ------------------------------------------------------------------
 
 -- The two dual-spec activation spells, by name as UnitCastingInfo reports them.
 local function isSpecSwitch(name)
@@ -728,6 +728,15 @@ local function isSpecSwitch(name)
         if name and name == GetSpellInfo(spell) then return true end
     end
     return false
+end
+
+-- Inscribing a glyph casts a spell named after the glyph.
+local function isTracked(name)
+    return isSpecSwitch(name) or (name and name:find("^Glyph of ") ~= nil)
+end
+
+function RT.Casting()
+    return bar.cast and bar.cast:IsShown()
 end
 
 -- Retail's cast bar art: background, border and name plate share one atlas.
@@ -748,7 +757,7 @@ end
 
 local function castTick(holder)
     local name, _, _, _, startMs, endMs = UnitCastingInfo("player")
-    if not name or not isSpecSwitch(name) then
+    if not name or not isTracked(name) then
         holder:Hide()
         RT.UpdateFooter()
         return
@@ -805,7 +814,7 @@ function RT.BuildCastBar(footer)
     bar.cast = holder
 
     RT.Listen("UNIT_SPELLCAST_START", function(_, unit)
-        if unit ~= "player" or not isSpecSwitch(UnitCastingInfo("player")) then return end
+        if unit ~= "player" or not isTracked(UnitCastingInfo("player")) then return end
         holder:Show()
         castTick(holder)
         RT.UpdateFooter()
